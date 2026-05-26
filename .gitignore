@@ -1,0 +1,63 @@
+# --- Project outputs (large / reproducible) ---
+datasets/
+models/
+checkpoints/
+figs/
+proposal/
+report/
+
+# Submissions and run artifacts
+submission*.csv
+*.csv.zip
+
+# Pretrained / trained weights
+*.safetensors
+*.bin
+*.pt
+*.pth
+*.ckpt
+*.onnx
+
+# Hugging Face download cache inside repo
+**/.cache/
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+.env
+.env.*
+!.env.example
+
+# Jupyter
+.ipynb_checkpoints/
+
+# --- OS / editor ---
+.DS_Store
+Thumbs.db
+*:Zone.Identifier
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# --- LaTeX (if built outside ignored dirs) ---
+*.aux
+*.log
+*.out
+*.nav
+*.synctex.gz
+*.fls
+*.fdb_latexmk
+*.bbl
+*.blg
+*.pdf
+
+# --- Logs ---
+*.log
+nohup.out
