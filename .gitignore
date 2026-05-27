@@ -8,6 +8,7 @@ report/
 
 # Submissions and run artifacts
 submission*.csv
+grid_search_results*.csv
 *.csv.zip
 
 # Pretrained / trained weights

@@ -46,17 +46,25 @@ def _resolve_table(data_dir: Path, stem: str) -> Path:
     )
 
 
-def build_pipeline() -> Pipeline:
+def build_pipeline(
+    *,
+    max_features: int = 100_000,
+    ngram_max: int = 2,
+    min_df: int = 3,
+    max_df: float = 0.9,
+    C: float = 4.0,
+    max_iter: int = 2000,
+) -> Pipeline:
     tfidf = TfidfVectorizer(
-        max_features=100_000,
-        ngram_range=(1, 2),
-        min_df=3,
-        max_df=0.9,
+        max_features=max_features,
+        ngram_range=(1, ngram_max),
+        min_df=min_df,
+        max_df=max_df,
         sublinear_tf=True,
     )
     base_lr = LogisticRegression(
-        C=4.0,
-        max_iter=2000,
+        C=C,
+        max_iter=max_iter,
         solver="saga",
     )
     clf = MultiOutputClassifier(base_lr, n_jobs=-1)

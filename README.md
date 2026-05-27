@@ -56,6 +56,12 @@ Weights land in `models/hateBERT/`. `train_hatebert.py` uses this folder automat
 python baseline_tfidf_lr.py
 ```
 
+**Baseline hyperparameter grid search** (validation split only, writes `grid_search_results_<timestamp>.csv`):
+
+```bash
+python grid_search_tfidf_lr.py
+```
+
 **DistilBERT** (default batch size 16):
 
 ```bash
@@ -122,6 +128,7 @@ Baseline does **not** plot training loss curves (single `fit` on sklearn pipelin
 ```
 .
 ├── baseline_tfidf_lr.py      # TF-IDF + logistic regression
+├── grid_search_tfidf_lr.py # Grid search for baseline TF-IDF + LR
 ├── train_transformer.py    # Shared Trainer pipeline
 ├── train_distilbert.py     # Entry: DistilBERT defaults
 ├── train_hatebert.py       # Entry: HateBERT defaults
