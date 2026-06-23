@@ -9,6 +9,12 @@ report/
 # Submissions and run artifacts
 submission*.csv
 grid_search_results*.csv
+perspective_results*.csv
+perspective_cache/
+llm_api_results*.csv
+llm_api_cache/
+transformer_threshold_results*.csv
+transformer_cache/
 *.csv.zip
 
 # Pretrained / trained weights

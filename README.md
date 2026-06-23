@@ -7,6 +7,8 @@ This repository implements:
 1. **Baseline** — TF-IDF (1–2 grams) + one-vs-rest logistic regression  
 2. **DistilBERT** — `distilbert-base-uncased` fine-tuned with Hugging Face `Trainer`  
 3. **HateBERT** — `GroNLP/hateBERT` (abusive-language pre-trained BERT) fine-tuned the same way  
+4. **Perspective API** — external Jigsaw toxicity scores on the same validation split (cached locally)  
+5. **LLM APIs** — DeepSeek and Qwen (DashScope) zero-shot JSON scoring via prompt
 
 Training uses a fixed validation split (`random_state=42`, 10% holdout), reports ROC-AUC / PR-AUC / F1, and writes timestamped Kaggle submissions and optional figures under `figs/`.
 
@@ -82,6 +84,35 @@ python train_hatebert.py --model-name ./models/hateBERT
 python train_hatebert.py --max-train-samples 2000 --epochs 1
 ```
 
+**Perspective API baseline** (validation subset, scores cached under `perspective_cache/`):
+
+```bash
+export PERSPECTIVE_API_KEY="your_key"
+python perspective_baseline.py
+python perspective_baseline.py --max-samples 500 --sleep 0.3
+python perspective_baseline.py --scores-only   # re-evaluate from cache
+```
+
+**LLM API baselines** (DeepSeek / Qwen; default 200 validation samples; cached under `llm_api_cache/`):
+
+```bash
+# DeepSeek — https://platform.deepseek.com/
+export DEEPSEEK_API_KEY="sk-..."
+python llm_api_baseline.py --provider deepseek --max-samples 200 --sleep 0.5
+
+# Qwen via DashScope — https://dashscope.console.aliyun.com/
+export DASHSCOPE_API_KEY="sk-..."
+python llm_api_baseline.py --provider qwen --model qwen-plus --max-samples 200
+
+# Cheaper/faster Qwen variant
+python llm_api_baseline.py --provider qwen --model qwen-turbo --max-samples 200
+
+# Resume or re-evaluate from cache
+python llm_api_baseline.py --provider deepseek --scores-only
+```
+
+Copy `.env.example` to `.env` for local key storage (gitignored).
+
 ### 4. Outputs
 
 | Output | Location |
@@ -129,6 +160,8 @@ Baseline does **not** plot training loss curves (single `fit` on sklearn pipelin
 .
 ├── baseline_tfidf_lr.py      # TF-IDF + logistic regression
 ├── grid_search_tfidf_lr.py # Grid search for baseline TF-IDF + LR
+├── perspective_baseline.py # Perspective API validation baseline
+├── llm_api_baseline.py     # DeepSeek / Qwen LLM API baselines
 ├── train_transformer.py    # Shared Trainer pipeline
 ├── train_distilbert.py     # Entry: DistilBERT defaults
 ├── train_hatebert.py       # Entry: HateBERT defaults

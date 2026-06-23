@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import roc_auc_score
+from sklearn.metrics import average_precision_score, f1_score, roc_auc_score
 from sklearn.model_selection import train_test_split
 from sklearn.multioutput import MultiOutputClassifier
 from sklearn.pipeline import Pipeline
@@ -74,6 +74,60 @@ def build_pipeline(
 def stacked_positive_proba(pipe: Pipeline, X) -> np.ndarray:
     parts = pipe.predict_proba(X)
     return np.column_stack([p[:, 1] for p in parts])
+
+
+def _safe_roc_auc(y_true: np.ndarray, y_score: np.ndarray) -> float | None:
+    if len(np.unique(y_true)) < 2:
+        return None
+    return float(roc_auc_score(y_true, y_score))
+
+
+def compute_validation_metrics(
+    y_true: np.ndarray,
+    y_proba: np.ndarray,
+    label_cols: list[str],
+    *,
+    threshold: float = 0.5,
+) -> dict[str, float]:
+    """Validation metrics aligned with train_transformer.py (threshold=0.5 for F1)."""
+    metrics: dict[str, float] = {}
+    aucs: list[float] = []
+    prs: list[float] = []
+
+    for i, name in enumerate(label_cols):
+        y = y_true[:, i]
+        p = y_proba[:, i]
+        ra = _safe_roc_auc(y, p)
+        if ra is not None:
+            metrics[f"roc_auc_{name}"] = ra
+            aucs.append(ra)
+        metrics[f"pr_auc_{name}"] = float(average_precision_score(y, p))
+        prs.append(metrics[f"pr_auc_{name}"])
+
+    if aucs:
+        metrics["roc_auc_mean"] = float(np.mean(aucs))
+    metrics["pr_auc_mean"] = float(np.mean(prs))
+
+    preds = (y_proba >= threshold).astype(np.int32)
+    metrics["f1_micro"] = float(f1_score(y_true, preds, average="micro", zero_division=0))
+    metrics["f1_macro"] = float(f1_score(y_true, preds, average="macro", zero_division=0))
+    return metrics
+
+
+def print_validation_metrics(metrics: dict[str, float], label_cols: list[str]) -> None:
+    print("Validation ROC-AUC (per label):")
+    for name in label_cols:
+        key = f"roc_auc_{name}"
+        if key in metrics:
+            print(f"  {name:16s} {metrics[key]:.4f}")
+    if "roc_auc_mean" in metrics:
+        print(f"  {'mean':16s} {metrics['roc_auc_mean']:.4f}")
+    if "pr_auc_mean" in metrics:
+        print(f"  {'pr_auc_mean':16s} {metrics['pr_auc_mean']:.4f}")
+    if "f1_micro" in metrics:
+        print(f"  {'f1_micro':16s} {metrics['f1_micro']:.4f}")
+    if "f1_macro" in metrics:
+        print(f"  {'f1_macro':16s} {metrics['f1_macro']:.4f}")
 
 
 def main() -> None:
@@ -148,13 +202,12 @@ def main() -> None:
         print("Fitting on train split for validation...")
         pipe.fit(X_tr, y_tr)
         val_proba = stacked_positive_proba(pipe, X_val)
-        print("Validation ROC-AUC (per label):")
-        aucs = []
-        for i, name in enumerate(LABEL_COLS):
-            a = roc_auc_score(y_val.iloc[:, i], val_proba[:, i])
-            aucs.append(a)
-            print(f"  {name:16s} {a:.4f}")
-        print(f"  {'mean':16s} {float(np.mean(aucs)):.4f}")
+        metrics = compute_validation_metrics(
+            y_val.values.astype(np.float64),
+            val_proba,
+            LABEL_COLS,
+        )
+        print_validation_metrics(metrics, LABEL_COLS)
 
         if save_figures and fig_dir is not None:
             plot_baseline_final_eval(
