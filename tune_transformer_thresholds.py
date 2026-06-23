@@ -8,6 +8,7 @@ reports metrics at tau=0.5 and after per-label threshold search.
 Examples:
   python tune_transformer_thresholds.py --model distilbert
   python tune_transformer_thresholds.py --model hatebert
+  python tune_transformer_thresholds.py --model distilbert --stage final
   python tune_transformer_thresholds.py --model distilbert --checkpoint ./checkpoints/distilbert/val/checkpoint-17952
 """
 
@@ -43,7 +44,6 @@ from train_transformer import (
     DISTILBERT_DEFAULTS,
     HATEBERT_DEFAULTS,
     ToxicCommentDataset,
-    _default_hatebert_model,
     get_trainer_tokenizer,
     predict_proba,
 )
@@ -56,13 +56,27 @@ MODEL_PRESETS = {
 }
 
 
-def find_latest_checkpoint(val_dir: Path) -> Path:
+def find_latest_val_checkpoint(val_dir: Path) -> Path:
     if not val_dir.is_dir():
         raise FileNotFoundError(f"Missing validation checkpoint directory: {val_dir}")
     candidates = sorted(val_dir.glob("checkpoint-*"), key=lambda p: p.stat().st_mtime)
     if not candidates:
         raise FileNotFoundError(f"No checkpoint-* folders under {val_dir}")
     return candidates[-1]
+
+
+def resolve_checkpoint_dir(output_dir: Path, *, stage: str) -> Path:
+    if stage == "val":
+        return find_latest_val_checkpoint(output_dir / "val")
+    if stage == "final":
+        final_dir = output_dir / "final"
+        if not (final_dir / "config.json").is_file():
+            raise FileNotFoundError(
+                f"Missing final checkpoint under {final_dir}. "
+                "Run train_transformer.py through the full-data stage first."
+            )
+        return final_dir
+    raise ValueError(f"Unknown stage: {stage}")
 
 
 def _checkpoint_step(path: Path) -> int:
@@ -125,10 +139,16 @@ def main() -> None:
     parser.add_argument("--val-size", type=float, default=0.1)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument(
+        "--stage",
+        choices=("val", "final"),
+        default="val",
+        help="Which checkpoint to load: val (90%% train) or final (100%% train).",
+    )
+    parser.add_argument(
         "--checkpoint",
         type=Path,
         default=None,
-        help="Validation checkpoint directory (default: latest under checkpoints/<model>/val/).",
+        help="Checkpoint directory (default: latest under checkpoints/<model>/<stage>/).",
     )
     parser.add_argument("--max-length", type=int, default=256)
     parser.add_argument(
@@ -165,6 +185,7 @@ def main() -> None:
         PROJECT_ROOT
         / "transformer_cache"
         / args.model
+        / args.stage
         / "validation_proba.csv"
     )
     cache_path = (args.cache or default_cache).expanduser().resolve()
@@ -184,11 +205,10 @@ def main() -> None:
         val_proba = pd.read_csv(cache_path)[LABEL_COLS].to_numpy(dtype=np.float64)
         checkpoint_dir = args.checkpoint
     else:
-        checkpoint_dir = args.checkpoint
-        if checkpoint_dir is None:
-            checkpoint_dir = find_latest_checkpoint(preset.output_dir / "val")
+        if args.checkpoint is None:
+            checkpoint_dir = resolve_checkpoint_dir(preset.output_dir, stage=args.stage)
         else:
-            checkpoint_dir = checkpoint_dir.expanduser().resolve()
+            checkpoint_dir = args.checkpoint.expanduser().resolve()
 
         print(f"Loading checkpoint: {checkpoint_dir.resolve()}")
         trainer = build_predict_trainer(checkpoint_dir, batch_size=batch_size)
@@ -218,7 +238,7 @@ def main() -> None:
     metrics_tuned = evaluate(y_val, val_proba)
     thresholds = search_best_thresholds(y_val, val_proba)
 
-    print(f"\n{args.model} — validation metrics (threshold=0.5):")
+    print(f"\n{args.model} ({args.stage}) — validation metrics (threshold=0.5):")
     print_validation_metrics(metrics_default, LABEL_COLS)
 
     print("\nPer-label F1 with tuned thresholds:")
@@ -230,6 +250,7 @@ def main() -> None:
     summary: dict[str, float | int | str] = {
         "run_id": run_ts,
         "model": args.model,
+        "stage": args.stage,
         "checkpoint": str(checkpoint_dir) if checkpoint_dir is not None else "",
         "checkpoint_step": _checkpoint_step(checkpoint_dir) if checkpoint_dir is not None else -1,
         "n_samples": len(val_df),

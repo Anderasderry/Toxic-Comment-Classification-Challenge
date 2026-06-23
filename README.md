@@ -127,8 +127,21 @@ Large artifacts (`datasets/`, `models/`, `checkpoints/`, `figs/`, submissions) a
 
 - **Validation**: default `--val-size 0.1`, then refit on full training data (same as baseline).  
 - **Epochs**: default `--epochs 2` per training phase (validation run + full-data run).  
+- **Checkpoints**: validation weights under `checkpoints/<model>/val/checkpoint-*`; full-data weights saved to `checkpoints/<model>/final/` after the refit stage.  
 - **Transformer loss**: multi-label BCE with sigmoid (`problem_type="multi_label_classification"`).  
 - **Metrics on validation**: per-label ROC-AUC, mean ROC-AUC, PR-AUC, macro/micro F1.  
+
+### Threshold tuning (transformers)
+
+```bash
+# Validation checkpoint (90% train) — for reporting on holdout
+python tune_transformer_thresholds.py --model distilbert --stage val
+
+# Full-data checkpoint (100% train) — after remote full training
+python tune_transformer_thresholds.py --model distilbert --stage final
+```
+
+Probabilities are cached under `transformer_cache/<model>/<stage>/validation_proba.csv`.
 
 ### Useful flags
 
@@ -163,6 +176,7 @@ Baseline does **not** plot training loss curves (single `fit` on sklearn pipelin
 ├── perspective_baseline.py # Perspective API validation baseline
 ├── llm_api_baseline.py     # DeepSeek / Qwen LLM API baselines
 ├── train_transformer.py    # Shared Trainer pipeline
+├── tune_transformer_thresholds.py  # Per-label threshold search for transformers
 ├── train_distilbert.py     # Entry: DistilBERT defaults
 ├── train_hatebert.py       # Entry: HateBERT defaults
 ├── download.py             # Kaggle competition data

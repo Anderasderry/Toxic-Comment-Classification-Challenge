@@ -154,6 +154,16 @@ def get_trainer_tokenizer(trainer: Trainer):
     return getattr(trainer, "processing_class", None) or trainer.tokenizer
 
 
+def save_trainer_checkpoint(trainer: Trainer, output_dir: Path) -> Path:
+    """Persist model + tokenizer for later inference (e.g. threshold tuning)."""
+    output_dir = output_dir.expanduser().resolve()
+    output_dir.mkdir(parents=True, exist_ok=True)
+    trainer.save_model(str(output_dir))
+    get_trainer_tokenizer(trainer).save_pretrained(output_dir)
+    print(f"Saved checkpoint: {output_dir}")
+    return output_dir
+
+
 def _training_arguments(**kwargs) -> TrainingArguments:
     """Support both eval_strategy (new) and evaluation_strategy (legacy)."""
     try:
@@ -452,6 +462,7 @@ def main(defaults: TrainDefaults = DISTILBERT_DEFAULTS) -> None:
             fp16=fp16,
         )
         full_trainer.train()
+        save_trainer_checkpoint(full_trainer, args.output_dir / "final")
         predict_trainer = full_trainer
     else:
         print("Training on full training data...")
@@ -465,7 +476,7 @@ def main(defaults: TrainDefaults = DISTILBERT_DEFAULTS) -> None:
                 args.max_length,
             ),
             eval_dataset=None,
-            output_dir=args.output_dir,
+            output_dir=args.output_dir / "final",
             label_cols=LABEL_COLS,
             epochs=args.epochs,
             batch_size=args.batch_size,
@@ -476,6 +487,7 @@ def main(defaults: TrainDefaults = DISTILBERT_DEFAULTS) -> None:
             fp16=fp16,
         )
         predict_trainer.train()
+        save_trainer_checkpoint(predict_trainer, args.output_dir / "final")
 
     print("Predicting test set...")
     test_ds = ToxicCommentDataset(
